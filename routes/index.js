@@ -11,46 +11,33 @@ const redisClient = redis.createClient({
 flagsmith.init({
   environmentID: 'Go7k4WG2XzjZnzQsuZPoci',
   cache: {
-    has: (key) => redisClient.exists(key, (err, reply) => {
-      console.log("check " + key + " from cache with reply " + reply);
-      return (reply === 1)
+    has: (key) => new Promise((resolve,reject)=>{
+      redisClient.exists(key, (err, reply) => {
+        console.log("check " + key + " from cache", err, reply);
+        resolve(reply ===1)
+      })
     }),
-    get: (key) => redisClient.get(key, (err, cacheValue) => {
-      console.log("get " + key + " from cache");
-      return cacheValue
+    get: (key) => new Promise((resolve)=>{
+      redisClient.get(key, (err, cacheValue) => {
+        console.log("get " + key + " from cache");
+        resolve(cacheValue && JSON.parse(cacheValue))
+      })
     }),
-    set: (key, value) => redisClient.set(key, value, (err, reply) => {
-      console.log("set " + key + " from cache");
+    set: (key, value) => new Promise((resolve)=>{
+      redisClient.set(key, JSON.stringify(value), (err, reply) => {
+        console.log("set " + key + " to cache", err);
+        resolve()
+      })
     }),
   }
 });
 
 router.get('/', function (req, res, next) {
-  flags = flagsmith.getFlags();
-
   flagsmith.getValue('background_colour').then((value) => {
     res.render('index', {
       title: value
     });
   });
 });
-
-function getFlags(key) {
-  redisClient.get(key, (err, cacheValue) => {
-    if (err) throw err;
-
-    if (cacheValue) {
-      console.log(key + " found in cache");
-      return cacheValue
-    } else {
-      console.log(key + " *not* found in cache");
-      flagsmith.getValue(key).then((value) => {
-        redisClient.set(key, value, (err, reply) => {
-          if (err) throw err;
-        });
-      });
-    }
-  });
-}
 
 module.exports = router;
